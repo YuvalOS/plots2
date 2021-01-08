@@ -1,7 +1,8 @@
 class UsersController < ApplicationController
   before_action :require_no_user, only: [:new]
   before_action :require_user, only: %i(edit update save_settings settings)
-   before_action :set_user, only: %i(info followed following followers)
+  before_action :set_user, only: %i(info followed following followers)
+  include Pagy::Backend
 
   def new
     @user = User.new
@@ -122,27 +123,23 @@ class UsersController < ApplicationController
       end
     end
     # allow admins to view recent users
-    @users = if params[:id]
-               User.order(order_string)
-                             .where('rusers.role = ?', params[:id])
-                             .where('rusers.status = 1')
-                             .page(params[:page])
-
-             elsif @tagname_param
-               User.where(id: UserTag.where(value: @tagname_param).collect(&:uid))
-                             .page(params[:page])
-
-             else
-               # recently active
-               User.select('*, rusers.status, MAX(node_revisions.timestamp) AS last_updated')
-                            .joins(:revisions)
-                            .where("node_revisions.status = 1")
-                            .group('rusers.id')
-                            .order(order_string)
-                            .page(params[:page])
-             end
-
+    if params[:id]
+      @users = User.order(order_string)
+        .where('rusers.role = ?', params[:id])
+        .where('rusers.status = 1')
+    elsif @tagname_param
+      @users = User.where(id: UserTag.where(value: @tagname_param).collect(&:uid))
+    else
+      # recently active
+      group_by = Rails.env.development? ? false : 'rusers.id' # for GitPod compatibility; #8117
+      @users = User.select('*, rusers.id, rusers.status, MAX(node_revisions.timestamp) AS last_updated')
+        .joins(:revisions)
+        .where("node_revisions.status = 1")
+        .order(order_string)
+        .group(group_by)
+    end
     @users = @users.where('rusers.status = 1') unless current_user&.can_moderate?
+    @pagy, @users = pagy(@users, items: 24)
   end
 
   def profile

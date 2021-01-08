@@ -80,7 +80,7 @@
       </div>
     <% end %>
   </div>
-  <%= will_paginate @users, renderer: WillPaginate::ActionView::BootstrapLinkRenderer unless @unpaginated %>
+  <%== pagy_bootstrap_nav @pagy %>
 </div>
 
 <div class="col-md-12 col-lg-6 order-2 d-none d-lg-block">
